@@ -1,0 +1,6 @@
+POST http://pwa-4-younas.herokuapp.com/notify
+Content-Type: application/json
+
+{
+    "message": "Eine Push Benachrichtigung von Haroon Younas wurde aufgerufen"
+}
