@@ -19,6 +19,8 @@
 </template>
 
 <script>
+import { openDB } from 'idb';
+
 import ButtonGet from '@/components/ButtonGet.vue';
 import CardView from '@/components/CardView.vue';
 import axios from 'axios';
@@ -37,30 +39,49 @@ export default {
       offline: false,
       publicVapidKey:
         'BI3xP181nkMMKLD9QKAftKgDmb_o5nm5NZT1YUJLOwhOVUNU10KpAmPbfJu_bvwaXBsvS1JjrD7mzKtLDpvVoJI',
+      db: null,
     };
   },
+  created() {
+    document.addEventListener('swUpdated', this.updateAvailable, { once: true });
+    window.addEventListener('online', () => (this.offline = false));
+    window.addEventListener('offline', () => (this.offline = true));
+  },
   methods: {
-    urlBase64ToUint8Array(base64String) {
-      const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-      const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-      const rawData = window.atob(base64);
-      const outputArray = new Uint8Array(rawData.length);
-      for (let i = 0; i < rawData.length; ++i) {
-        outputArray[i] = rawData.charCodeAt(i);
-      }
-      return outputArray;
+    async openDB() {
+      this.db = await openDB('employeesDB1', 1, {
+        upgrade(db) {
+          db.createObjectStore('employees', { keyPath: 'id' });
+        },
+      });
     },
-    async getEmployees() {
+    async getOnline() {
       try {
-        const { data } = await axios({
-          url: this.serverAddress + '/employees',
-          method: 'GET',
+        let { data } = await axios.get(`${this.serverAddress}/employees`);
+        this.employees = data.map((el) => ({ ...el, isDeleted: false }));
+
+        await this.employees.forEach((element) => {
+          this.db.put('employees', element);
         });
-        this.employees = data;
       } catch (error) {
         console.error(error);
       }
     },
+    async getOffline() {
+      const employees = await this.db.getAll('employees');
+      this.employees = employees.filter((el) => el.isDeleted == false);
+    },
+    // async getEmployees() {
+    //   try {
+    //     const { data } = await axios({
+    //       url: this.serverAddress + '/employees',
+    //       method: 'GET',
+    //     });
+    //     this.employees = data;
+    //   } catch (error) {
+    //     console.error(error);
+    //   }
+    // },
     async delEmployee(e) {
       console.log(`${this.serverAddress}/employee/${e.id}`);
       await axios({
@@ -71,7 +92,9 @@ export default {
     },
     fetchData() {
       console.log('fetchData called');
-      this.getEmployees();
+      // this.getEmployees();
+      if (this.offline) this.getOffline();
+      else this.getOnline();
     },
     updateAvailable() {
       alert('Update vorhanden, bitte App neu starten!');
@@ -88,11 +111,16 @@ export default {
       });
       await axios.post('/subscribe', subscription);
     },
-  },
-  created() {
-    document.addEventListener('swUpdated', this.updateAvailable, { once: true });
-    window.addEventListener('online', () => (this.offline = false));
-    window.addEventListener('offline', () => (this.offline = true));
+    urlBase64ToUint8Array(base64String) {
+      const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+      const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+      const rawData = window.atob(base64);
+      const outputArray = new Uint8Array(rawData.length);
+      for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+      }
+      return outputArray;
+    },
   },
 };
 </script>
